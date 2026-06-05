@@ -11,8 +11,9 @@ pwndbg issue #3005
 ---
 
 ## Why I Chose This Issue
-
-[1-2 paragraphs explaining why this issue interests you, how it matches your skills/learning goals, what you hope to learn]
+I picked issue #3005 "Speed up the kernel images download" from the pwndbg repo because it's a concrete performance problem with a clear fix. CI is fine since images get cached, but first-time local downloads are slow because everything downloads one at a time.
+The fix is to run the download script paralelly, which is just a sript change without any new dependencies. It is a contained but meaningful problem to solve as a first-time contributor. No changes using Python is required unless the CI workflow needs touching.
+I left a comment on the issue introducing myself, asked if the parallel downloads approach works for them, and offered to open a draft PR. I also connected with the community via discord to get more clarification on their specific requests.
 
 ---
 
