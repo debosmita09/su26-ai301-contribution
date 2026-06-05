@@ -6,7 +6,7 @@ pwndbg issue #3005
 **Contribution Number:** 1 
 **Student:** Debosmita Mallick
 **Issue:** https://github.com/pwndbg/pwndbg/issues/3005 
-**Status:** Phase I In-Progress
+**Status:** Phase I: Completed | Phase II: In-Progress
 
 ---
 
