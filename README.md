@@ -54,9 +54,9 @@ Since pwndbg's 'setup.sh' explicitly does not support macOS, I set up my develop
 
 ### Reproduction Evidence
 
-- **Commit showing reproduction:** [Link to commit in your fork]
+- **Commit showing reproduction:** https://github.com/debosmita09/pwndbg/commit/313b3c7dd  in the branch: speed-up-kernel-images-download , https://github.com/debosmita09/pwndbg/tree/speed-up-kernel-images-download
 - **Screenshots/logs:** [If applicable]
-- **My findings:** [What you discovered during reproduction]
+- **My findings:** The issue is entirely in the while loop in download-kernel-images.sh in lines 28 to 31. The download() function call has no & to background it, so bash waits for each one to return before continuing the loop.
 
 ---
 
