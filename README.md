@@ -1,3 +1,4 @@
+<img width="1470" height="488" alt="Screenshot 2026-06-14 at 5 49 55 PM" src="https://github.com/user-attachments/assets/30e176cd-9b17-4b6b-877a-02cea646fed4" />
 # su26-ai301-contribution
 pwndbg issue #3005
 
@@ -55,7 +56,7 @@ Since pwndbg's 'setup.sh' explicitly does not support macOS, I set up my develop
 ### Reproduction Evidence
 
 - **Commit showing reproduction:** https://github.com/debosmita09/pwndbg/commit/313b3c7dd  in the branch: speed-up-kernel-images-download , https://github.com/debosmita09/pwndbg/tree/speed-up-kernel-images-download
-- **Screenshots/logs:** [If applicable]
+- **Screenshots/logs:** <img width="1470" height="364" alt="Screenshot 2026-06-14 at 5 55 16 PM" src="https://github.com/user-attachments/assets/4c2ee77c-3979-4362-9398-f14cc4f51e0e" />
 - **My findings:** The issue is entirely in the while loop in download-kernel-images.sh in lines 28 to 31. The download() function call has no & to background it, so bash waits for each one to return before continuing the loop.
 
 ---
@@ -64,28 +65,39 @@ Since pwndbg's 'setup.sh' explicitly does not support macOS, I set up my develop
 
 ### Analysis
 
-[Your analysis of the root cause - what's causing the issue?]
+Root cause: In tests/library/qemu_system/download-kernel-images.sh at lines 28–31:
+
+while read -r hash file; do
+    echo "Downloading ${file}..."
+    download "${file}"   # ← no & = blocks until complete
+done < "${OUT_DIR}/hashsums.txt"
+
+Each download() call is synchronous. Bash does not proceed to the next loop iteration until wget finishes, with multiple large kernel images.
+
+A secondary issue: the script uses set -o errexit at the top. This flag causes the script to exit if a background job (&) fails before wait is called, making it incompatible with the parallel approach without modification.
 
 ### Proposed Solution
 
-[High-level description of your fix approach]
+Background each download() call with &, collect the PIDs, then wait on each one after the loop. Replace set -o errexit with set -o pipefail to maintain error detection while supporting background jobs.
 
 ### Implementation Plan
 
 Using UMPIRE framework (adapted):
 
-**Understand:** [Restate the problem]
+**Understand:** The download script fetches multiple kernel image files sequentially. First-time contributors experience long waits because files download one at a time instead of concurrently.
 
-**Match:** [What similar patterns/solutions exist in the codebase?]
+**Match:** No parallel download pattern exists elsewhere in the pwndbg codebase to reference. The fix uses standard idiomatic bash: backgrounding jobs with &, storing PIDs in an array, and collecting results with wait.
 
-**Plan:** [Step-by-step implementation plan]
-1. [Modify file X to do Y]
-2. [Add function Z]
-3. [Update tests]
+**Plan:** 
+1. Replace set -o errexit with set -o pipefail in download-kernel-images.sh — errexit is incompatible with background jobs
+2. Add a pids=() array before the while loop
+3. Append & to the download "${file}" call and push its PID with pids+=($!)
+4. After the loop, iterate over pids and wait on each — track failures with a failed flag
+5. Exit with code 1 if any download failed
 
-**Implement:** [Link to your branch/commits as you work]
+**Implement:** https://github.com/debosmita09/pwndbg/tree/speed-up-kernel-images-download, https://github.com/debosmita09/pwndbg/commit/313b3c7dd
 
-**Review:** [Self-review checklist - does it follow the project's contribution guidelines?]
+**Review:** Read docs/contributing/ for commit message conventions and PR guidelines
 
 **Evaluate:** [How will you verify it works?]
 
