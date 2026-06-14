@@ -41,13 +41,16 @@ tests/library/qemu_system/download-kernel-images.sh is the only file involved wi
 
 ### Environment Setup
 
-[Notes on setting up your local development environment - challenges you faced, how you solved them]
+Since pwndbg's 'setup.sh' explicitly does not support macOS, I set up my development environment using Docker. I installed Docker Desktop and used the `ubuntu24.04-mount` service from the project's included 'docker-compose.yml', which spins up a Ubuntu 24.04 container with pwndbg pre-installed and the local repo mounted at `/pwndbg`. This meant any file edits I made in VS Code on my Mac were immediately reflected inside the container, and the git history was fully accessible. I also faced a lot of problems setting up the environment along the way like the default branch being 'dev' instead of 'main', running git push before creating a personal access token, and running 'git add' from the repo root '/pwndbg' inside the container (otherwise the paths were doubled up incorrectly). I also had to configure my git identity inside the container since it started as a blank root environment without any git config.
 
 ### Steps to Reproduce
 
-1. [Step 1]
-2. [Step 2]
-3. [Observed result]
+1. Cloned my fork and started the mounted container using:
+   'cd ~/pwndbg', and 'docker compose run --rm ubuntu24.04-mount'
+2. I navigated to the download script inside the container using: cd /pwndbg/tests/library/qemu_system
+3. I ran the download script using: ./download-kernel-images.sh
+4. Expected: All "Downloading..." lines appear immediately, showing that the files download in parallel.
+5. Observed: Files downloaded one at a time, with each line only appearing after the previous file finishes.
 
 ### Reproduction Evidence
 
