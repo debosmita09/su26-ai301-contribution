@@ -6,7 +6,7 @@ pwndbg issue #3005
 **Contribution Number:** 1 
 **Student:** Debosmita Mallick
 **Issue:** https://github.com/pwndbg/pwndbg/issues/3005 
-**Status:** Phase I: Completed | Phase II: In-Progress
+**Status:** Phase I: Completed | Phase II: Completed | Phase III: In-Progress
 
 ---
 
@@ -21,19 +21,19 @@ I left a comment on the issue introducing myself, asked if the parallel download
 
 ### Problem Description
 
-[In your own words, what's broken or missing?]
+The kernel image download script is downloading each image one at a time in a sequential while loop, with each file requiring to be fully completed for the next one to start. This is making the total download time equal to the sum of all individual download times, which is a lot.
 
 ### Expected Behavior
 
-[What should happen?]
+All kernel images should download simultaneously in parallel, making the total download time equal to the time taken by the single slowest download file instead of the sum of all individual file download times.
 
 ### Current Behavior
 
-[What actually happens?]
+Running ./download-kernel-images.sh downloads each image one at a time. This is evident from seeing the next "Downloading..." line only appearing after the previous file finishes.
 
 ### Affected Components
 
-[Which parts of the codebase are involved?]
+tests/library/qemu_system/download-kernel-images.sh is the only file involved with this issue, with kernel-tests.sh calling the download script when no cached images exist.
 
 ---
 
