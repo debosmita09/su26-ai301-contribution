@@ -99,15 +99,6 @@ Using UMPIRE framework (adapted):
 
 **Review:** Read docs/contributing/ for commit message conventions, PR guideline, sand linting requirements. The PR targets the dev branch of pwndbg/pwndbg as required, the project does not use main for development. Keep the change scoped to exactly one file with no unrelated modifications. Run ./lint.sh inside the container to verify the shell script passes shfmt formatting checks, which is enforced by the pre-push hook installed via setup-dev.sh.
 
-**Evaluate:** Here are the two sections rewritten as paragraphs:
-
----
-
-**Review:**
-Before opening the PR, I reviewed the project's `CLAUDE.md` and `docs/contributing/` to understand commit message conventions, PR guidelines, and linting requirements. The PR targets the `dev` branch of `pwndbg/pwndbg` as required — the project does not use `main` for development. I kept the change scoped to exactly one file with no unrelated modifications. I ran `./lint.sh` inside the container to verify the shell script passes `shfmt` formatting checks, which is enforced by the pre-push hook installed via `setup-dev.sh`.
-
----
-
 **Evaluate:**
 Since this is a shell script that performs external network I/O, there are no automated unit or integration tests to write or run. Verification is observational, i.e after applying the fix, running `./download-kernel-images.sh` shows all "Downloading..." lines appearing before any file completes, confirming parallel execution. Running `time ./download-kernel-images.sh` gives a total wall time of 5 seconds, which is roughly equal to the slowest single download rather than the sum of all downloads. Error handling is also preserved, where if any individual download fails, the script tracks it via the `failed` flag and exits with code 1 with a clear error message.
 
@@ -182,6 +173,9 @@ Since this is a shell script that performs external network I/O, there are no au
 
 ## Resources Used
 
-- [Link to helpful documentation]
-- [Tutorial or Stack Overflow post that helped]
-- [GitHub issues or discussions that helped]
+- https://github.com/pwndbg/pwndbg/blob/dev/README.md
+- https://github.com/pwndbg/pwndbg/blob/dev/CLAUDE.md
+- https://github.com/pwndbg/pwndbg/tree/dev/docs/contributing
+- https://github.com/pwndbg/pwndbg/blob/dev/docker-compose.yml
+- https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens
+- https://www.gnu.org/software/bash/manual/bash.html#Job-Control
