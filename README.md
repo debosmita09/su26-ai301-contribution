@@ -143,15 +143,33 @@ Since this is a shell script that performs external network I/O, there are no au
 
 ## Pull Request
 
-**PR Link:** [GitHub PR URL when submitted]
+**PR Link:** https://github.com/pwndbg/pwndbg/pull/3972
 
-**PR Description:** [Draft or final PR description - much of the content above can be adapted]
+**PR Description:**  Closing Issue #3005
+
+Speeds up the kernel image download script by parallelizing all wget calls. Previously, download-kernel-images.sh downloaded each kernel image sequentially in a while loop, making first-time local setup slow. This change backgrounds each download with &, collects the PIDs, and waits on all of them after the loop, so all images download simultaneously.
+
+Issue #3005 reported that first-time local kernel test setup is unnecessarily slow because images download one at a time. Investigation traced the bottleneck to tests/library/qemu_system/download-kernel-images.sh lines 28–31, where download() is called synchronously with no backgrounding. CI is unaffected since images are cached after the first run, but local contributors experience the full sequential wait every time they set up a fresh environment.
+
+Actual description posted:
+
+The `download-kernel-images.sh` script downloaded kernel images sequentially, 
+making first-time local setup slow. This change backgrounds each `wget` call 
+and waits for all PIDs after the loop so all images download in parallel.
+
+- Replaced`set -o errexit` with `set -o pipefail` (for background job compatibility)
+- Collected PIDs after each backgrounded download
+- Waits on each PID individually and exits with non-zero if any download fails
+
++ [x] I read the contributing documentation.
++ [x] I am providing a screenshot of the fixed bug.
+<img width="1470" height="375" alt="Screenshot 2026-06-14 at 6 40 59 PM" src="https://github.com/user-attachments/assets/70a6202f-b795-4823-a10a-ff2dc069bf1a" />
 
 **Maintainer Feedback:**
 - [Date]: [Summary of feedback received]
 - [Date]: [How you addressed it]
 
-**Status:** [Awaiting review / Iterating / Approved / Merged]
+**Status:** Awaiting review
 
 ---
 
