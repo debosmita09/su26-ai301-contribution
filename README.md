@@ -169,7 +169,7 @@ and waits for all PIDs after the loop so all images download in parallel.
 - [Date]: [Summary of feedback received]
 - [Date]: [How you addressed it]
 
-**Status:** Awaiting review
+**Status:** Merged
 
 ---
 
