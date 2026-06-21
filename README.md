@@ -6,7 +6,7 @@ pwndbg issue #3005
 **Contribution Number:** 1 
 **Student:** Debosmita Mallick
 **Issue:** https://github.com/pwndbg/pwndbg/issues/3005 
-**Status:** Phase I: Completed | Phase II: Completed | Phase III: In-Progress
+**Status:** Phase I: Completed | Phase II: Completed | Phase III: Completed | Phase IV: In-Progress
 
 ---
 
@@ -127,7 +127,7 @@ The kernel-tests.sh script, which calls download-kernel-images.sh is the closest
 
 ## Implementation Notes
 
-### Week [2] Progress
+### Week 2 Progress
 
 The following notes the things I built and modified:
 - Modified tests/library/qemu_system/download-kernel-images.sh to parallelize all kernel image downloads.
@@ -137,7 +137,7 @@ The following notes the things I built and modified:
 - After the loop, it iterates over pids and waits on each one, where a failed=1 flag tracks any non-zero exit.
 - Script exits with code 1 and a clear error message is printed if any individual download fails.
 
-The chalenges I faced included:
+The challenges I faced included:
 - set -o errexit silently broke the parallel approach on the first attempt. The script would exit immediately after the first backgrounded job without waiting. Took some investigation to understand why and switch to set -o pipefail.
 - Had to configure git identity manually inside the Docker container. It was a blank root environment, with no git config by default.
 - The project's default branch is dev not main, so git rebase origin/main failed until I switched to origin/dev.
