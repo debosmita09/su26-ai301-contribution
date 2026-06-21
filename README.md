@@ -108,36 +108,47 @@ Since this is a shell script that performs external network I/O, there are no au
 
 ### Unit Tests
 
-- [ ] Test case 1: [Description]
-- [ ] Test case 2: [Description]
-- [ ] Test case 3: [Description]
+This change is in a shell script that performs external network I/O (wget downloads). There are no unit-testable functions to isolate.
 
 ### Integration Tests
 
-- [ ] Integration scenario 1
-- [ ] Integration scenario 2
+The kernel-tests.sh script, which calls download-kernel-images.sh is the closest integration layer, but it requires live network access and QEMU to run. The CI handles this, and the relevant jobs passed.
 
 ### Manual Testing
 
-[What you tested manually and results]
+- Ran ./download-kernel-images.sh inside the ubuntu24.04-mount Docker container before the fix: files downloaded one at a time, with each "Downloading..." line appearing only after the previous file finished.
+- Applied the fix: backgrounded downloads with &, collected PIDs, added wait loop with failure tracking, replaced set -o errexit with set -o pipefail.
+- Ran the script again after the fix: all "Downloading..." lines appeared immediately, confirming parallel execution.
+- Ran time ./download-kernel-images.sh: total wall time was ~5 seconds, roughly equal to the slowest single file rather than the sum of all files.
+- Ran ./lint.sh inside the container: shell script passed shfmt formatting checks enforced by the pre-push hook from setup-dev.sh.
+- Error handling verified: the failed flag correctly tracked any download that exits non-zero and exits the script with code 1 with a clear error message.
 
 ---
 
 ## Implementation Notes
 
-### Week [X] Progress
+### Week [2] Progress
 
-[What you built this week, challenges faced, decisions made]
+The following notes the things I built and modified:
+- Modified tests/library/qemu_system/download-kernel-images.sh to parallelize all kernel image downloads.
+- Replaced set -o errexit with set -o pipefail — errexit is incompatible with backgrounded jobs (&) since bash exits if a background process fails before wait is called.
+- Added pids=() array before the while loop to collect process IDs.
+- Appended & to the download "${file}" call inside the loop and stored each PID with pids+=($!).
+- After the loop, it iterates over pids and waits on each one, where a failed=1 flag tracks any non-zero exit.
+- Script exits with code 1 and a clear error message is printed if any individual download fails.
 
-### Week [Y] Progress
+The chalenges I faced included:
+- set -o errexit silently broke the parallel approach on the first attempt. The script would exit immediately after the first backgrounded job without waiting. Took some investigation to understand why and switch to set -o pipefail.
+- Had to configure git identity manually inside the Docker container. It was a blank root environment, with no git config by default.
+- The project's default branch is dev not main, so git rebase origin/main failed until I switched to origin/dev.
+- Two CI jobs failed with unrelated infrastructure issues: test_aarch64_store_instructions (QEMU connection timeout race condition) and tests-using-nix (transient Nix cache HTTP 416 error from cache.nixos.org). I left comments on the PR explaining that both are pre-existing/infrastructure issues unrelated to this change.
 
-[Continue documenting as you work]
 
 ### Code Changes
 
-- **Files modified:** [List]
-- **Key commits:** [Links to important commits]
-- **Approach decisions:** [Why you chose certain approaches]
+- **Files modified:** tests/library/qemu_system/download-kernel-images.sh
+- **Key commits:** https://github.com/debosmita09/pwndbg/commit/313b3c7dd
+- **Approach decisions:** I chose wait <pid> per-PID over a bare wait so individual exit codes are captured correctly. Then, I chose set -o pipefail over removing error checking entirely to preserve failure detection for pipeline commands elsewhere in the script. I kept the change scoped to exactly one file with no unrelated modifications.
 
 ---
 
