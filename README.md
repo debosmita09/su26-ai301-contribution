@@ -108,11 +108,11 @@ Since this is a shell script that performs external network I/O, there are no au
 
 ### Unit Tests
 
-This change is in a shell script that performs external network I/O (wget downloads). There are no unit-testable functions to isolate.
+This change is in a shell script that performs external network I/O (wget downloads). There are no unit-testable functions to isolate. However, I ran a mock-based shell test (test-parallel-downloads.sh) to exercise the fix directly without network access. It replaces wget with a fake version that sleeps 1 second per file and records nanosecond-precision start/end timestamps. It asserts that all downloads ran, total wall time is under 2.5s, and timestamps confirm actual overlap between concurrent downloads. This test targets the exact code path changed, which is the backgrounded & loop with wait.
 
 ### Integration Tests
 
-The kernel-tests.sh script, which calls download-kernel-images.sh is the closest integration layer, but it requires live network access and QEMU to run. The CI handles this, and the relevant jobs passed.
+The kernel-tests.sh script, which calls download-kernel-images.sh is the closest integration layer, but it requires live network access and QEMU to run. The CI handles this, and the relevant jobs passed. The two failures, test_aarch64_store_instructions and tests-using-nix are pre-existing infrastructure issues unrelated to this change, which is documented in the PR comments.
 
 ### Manual Testing
 
