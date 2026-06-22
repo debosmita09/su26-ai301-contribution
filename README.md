@@ -136,6 +136,7 @@ The following notes the things I built and modified:
 - Appended & to the download "${file}" call inside the loop and stored each PID with pids+=($!).
 - After the loop, it iterates over pids and waits on each one, where a failed=1 flag tracks any non-zero exit.
 - Script exits with code 1 and a clear error message is printed if any individual download fails.
+- Added test-parallel-downloads.sh with a mock-based test confirming parallel execution without network access.
 
 The challenges I faced included:
 - set -o errexit silently broke the parallel approach on the first attempt. The script would exit immediately after the first backgrounded job without waiting. Took some investigation to understand why and switch to set -o pipefail.
@@ -146,8 +147,8 @@ The challenges I faced included:
 
 ### Code Changes
 
-- **Files modified:** tests/library/qemu_system/download-kernel-images.sh
-- **Key commits:** https://github.com/debosmita09/pwndbg/commit/313b3c7dd
+- **Files modified:** tests/library/qemu_system/download-kernel-images.sh, tests/library/qemu_system/test-parallel-downloads.sh
+- **Key commits:** https://github.com/debosmita09/pwndbg/commit/313b3c7dd (parallel download fix), https://github.com/debosmita09/pwndbg/commit/1aa252d1b66cc14c12ed6a11513f32f6b95e7c7c (remove .DS_Store), https://github.com/debosmita09/pwndbg/commit/0ad54ca43a21edcd807d809749b5e819c6829605 (mock test)
 - **Approach decisions:** I chose wait <pid> per-PID over a bare wait so individual exit codes are captured correctly. Then, I chose set -o pipefail over removing error checking entirely to preserve failure detection for pipeline commands elsewhere in the script. I kept the change scoped to exactly one file with no unrelated modifications.
 
 ---
