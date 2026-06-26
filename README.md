@@ -6,7 +6,7 @@ pwndbg issue #3005
 **Contribution Number:** 1 
 **Student:** Debosmita Mallick
 **Issue:** https://github.com/pwndbg/pwndbg/issues/3005 
-**Status:** Phase I: Completed | Phase II: Completed | Phase III: Completed | Phase IV: In-Progress
+**Status:** Phase I: Completed | Phase II: Completed | Phase III: Completed | Phase IV: Completed
 
 ---
 
@@ -178,8 +178,8 @@ and waits for all PIDs after the loop so all images download in parallel.
 <img width="1470" height="375" alt="Screenshot 2026-06-14 at 6 40 59 PM" src="https://github.com/user-attachments/assets/70a6202f-b795-4823-a10a-ff2dc069bf1a" />
 
 **Maintainer Feedback:**
-- [Date]: [Summary of feedback received]
-- [Date]: [How you addressed it]
+- 06/15/2026: The maintainers supported the parallel download approach and recommended limiting the changes to the existing download script without introducing new dependencies. They also suggested that downloading compressed kernel images could further improve performance but noted that it would require additional changes to the image hosting infrastructure and decompression setup. After benchmarking, they confirmed that the implementation achieved a 2–2.5× speedup, and the only CI failure was an unrelated transient Nix cache issue.
+- 06/15/2026: I parallelized the kernel image downloads by running each wget process in the background, tracking all download processes, and waiting for them to complete while preserving proper error handling. I verified that the CI failure was unrelated to my changes, requested a re-run, and the PR was successfully merged after the performance improvements were confirmed. 
 
 **Status:** Merged
 
@@ -189,15 +189,21 @@ and waits for all PIDs after the loop so all images download in parallel.
 
 ### Technical Skills Gained
 
-[What you learned technically]
+- Setting up a Linux dev environment inside Docker on macOS
+- Navigating an unfamiliar open source codebase using CLAUDE.md and contributing docs
+- Bash parallel job patterns: backgrounding with &, PID arrays, wait with error tracking
+- GitHub PAT-based authentication for Git over HTTPS
 
 ### Challenges Overcome
 
-[What was hard and how you solved it]
+- macOS is not a supported platform for pwndbg's setup script — had to discover the Docker path by reading README.md and docker-compose.yml carefully
+Several layers of git configuration issues inside the container (identity, branch names, auth, working directory) had to be resolved one at a time
 
 ### What I'd Do Differently Next Time
 
-[Reflection on your process]
+- Check docker-compose.yml for available services before running any docker compose command
+- Configure git identity inside the container immediately after starting it
+- Use a PAT credential helper from the start instead of embedding the token in the remote URL
 
 ---
 
