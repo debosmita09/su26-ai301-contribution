@@ -96,7 +96,7 @@ Since pwndbg's `setup.sh` explicitly does not support macOS, I set up my develop
 - **Commit showing reproduction:** https://github.com/debosmita09/pwndbg/commit/313b3c7dd in the branch: `speed-up-kernel-images-download`, https://github.com/debosmita09/pwndbg/tree/speed-up-kernel-images-download
 - **Screenshots/logs:** <img width="1470" height="366" alt="Screenshot 2026-06-14 at 6 18 20 PM" src="https://github.com/user-attachments/assets/a0b396b1-feae-4f7e-9149-395e61210e34" />
 
-- **My findings:** The issue is entirely in the while loop in download-kernel-images.sh in lines 28 to 31. The download() function call has no & to background it, so bash waits for each one to return before continuing the loop.
+- **My findings:** The issue is entirely in the while loop in `download-kernel-images.sh` in lines 28 to 31. The download() function call has no & to background it, so bash waits for each one to return before continuing the loop.
 
 ---
 
@@ -106,11 +106,11 @@ Since pwndbg's `setup.sh` explicitly does not support macOS, I set up my develop
 
 Root cause: In `tests/library/qemu_system/download-kernel-images.sh` at lines 28–31:
 
-```javascript
-console.log("while read -r hash file; do
+```bash
+while read -r hash file; do
     echo "Downloading ${file}..."
-    download "${file}"   # ← no & = blocks until complete
-done < "${OUT_DIR}/hashsums.txt"");
+    download "${file}"
+done < "${OUT_DIR}/hashsums.txt"
 ```
 
 Each download() call is synchronous. Bash does not proceed to the next loop iteration until wget finishes, with multiple large kernel images.
@@ -140,7 +140,7 @@ Using UMPIRE framework (adapted):
 
 **Implement:** https://github.com/debosmita09/pwndbg/tree/speed-up-kernel-images-download, https://github.com/debosmita09/pwndbg/commit/313b3c7dd
 
-**Review:** Read `docs/contributing/` for commit message conventions, PR guideline, sand linting requirements. The PR targets the dev branch of pwndbg/pwndbg as required, the project does not use main for development. Keep the change scoped to exactly one file with no unrelated modifications. Run `./lint.sh` inside the container to verify the shell script passes shfmt formatting checks, which is enforced by the pre-push hook installed via setup-dev.sh.
+**Review:** Read `docs/contributing/` for commit message conventions, PR guideline, and linting requirements. The PR targets the dev branch of pwndbg/pwndbg as required, the project does not use main for development. Keep the change scoped to exactly one file with no unrelated modifications. Run `./lint.sh` inside the container to verify the shell script passes shfmt formatting checks, which is enforced by the pre-push hook installed via setup-dev.sh.
 
 **Evaluate:**
 Since this is a shell script that performs external network I/O, there are no automated unit or integration tests to write or run. Verification is observational, i.e after applying the fix, running `./download-kernel-images.sh` shows all "Downloading..." lines appearing before any file completes, confirming parallel execution. Running `time ./download-kernel-images.sh` gives a total wall time of 5 seconds, which is roughly equal to the slowest single download rather than the sum of all downloads. Error handling is also preserved, where if any individual download fails, the script tracks it via the `failed` flag and exits with code 1 with a clear error message.
