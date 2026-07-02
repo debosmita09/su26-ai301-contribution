@@ -259,7 +259,7 @@ and waits for all PIDs after the loop so all images download in parallel.
 - macOS is not a supported platform for pwndbg's setup script, so I had to discover the Docker path by reading README.md and `docker-compose.yml` carefully
 - Several layers of git configuration issues inside the container (identity, branch names, auth, working directory) had to be resolved one at a time
 
-### What I`d Do Differently Next Time
+### What I'd Do Differently Next Time
 
 - Check `docker-compose.yml` for available services before running any docker compose command
 - Configure git identity inside the container immediately after starting it
