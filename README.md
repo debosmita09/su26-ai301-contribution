@@ -5,7 +5,7 @@ pwndbg issue #3005
 
 **Contribution Number:** 1 
 **Student:** Debosmita Mallick
-**Issue:** `https://github.com/pwndbg/pwndbg/issues/3005` 
+**Issue:** https://github.com/pwndbg/pwndbg/issues/3005 
 **Status:** Phase I: Completed | Phase II: Completed | Phase III: Completed | Phase IV: Completed
 
 ---
@@ -93,7 +93,7 @@ Since pwndbg`s `setup.sh` explicitly does not support macOS, I set up my develop
 
 ### Reproduction Evidence
 
-- **Commit showing reproduction:** `https://github.com/debosmita09/pwndbg/commit/313b3c7dd` in the branch: `speed-up-kernel-images-download`, `https://github.com/debosmita09/pwndbg/tree/speed-up-kernel-images-download`
+- **Commit showing reproduction:** https://github.com/debosmita09/pwndbg/commit/313b3c7dd in the branch: `speed-up-kernel-images-download`, https://github.com/debosmita09/pwndbg/tree/speed-up-kernel-images-download
 - **Screenshots/logs:** <img width="1470" height="366" alt="Screenshot 2026-06-14 at 6 18 20 PM" src="https://github.com/user-attachments/assets/a0b396b1-feae-4f7e-9149-395e61210e34" />
 
 - **My findings:** The issue is entirely in the while loop in download-kernel-images.sh in lines 28 to 31. The download() function call has no & to background it, so bash waits for each one to return before continuing the loop.
@@ -107,7 +107,6 @@ Since pwndbg`s `setup.sh` explicitly does not support macOS, I set up my develop
 Root cause: In `tests/library/qemu_system/download-kernel-images.sh` at lines 28–31:
 
 <details>
-<summary>▶ Click to reveal code</summary>
 
 ```javascript
 console.log("while read -r hash file; do
@@ -143,7 +142,7 @@ Using UMPIRE framework (adapted):
 4. After the loop, iterate over pids and wait on each; track failures with a failed flag
 5. Exit with code 1 if any download failed
 
-**Implement:** `https://github.com/debosmita09/pwndbg/tree/speed-up-kernel-images-download`, `https://github.com/debosmita09/pwndbg/commit/313b3c7dd`
+**Implement:** https://github.com/debosmita09/pwndbg/tree/speed-up-kernel-images-download, https://github.com/debosmita09/pwndbg/commit/313b3c7dd
 
 **Review:** Read `docs/contributing/` for commit message conventions, PR guideline, sand linting requirements. The PR targets the dev branch of pwndbg/pwndbg as required, the project does not use main for development. Keep the change scoped to exactly one file with no unrelated modifications. Run `./lint.sh` inside the container to verify the shell script passes shfmt formatting checks, which is enforced by the pre-push hook installed via setup-dev.sh.
 
@@ -213,7 +212,7 @@ Although this idea was interesting, implementing it would require changes to the
 ### Code Changes
 
 - **Files modified:** `tests/library/qemu_system/download-kernel-images.sh`, `tests/library/qemu_system/test-parallel-downloads.sh`
-- **Key commits:** `https://github.com/debosmita09/pwndbg/commit/313b3c7dd` (parallel download fix), `https://github.com/debosmita09/pwndbg/commit/1aa252d1b66cc14c12ed6a11513f32f6b95e7c7c` (remove .DS_Store), `https://github.com/debosmita09/pwndbg/commit/0ad54ca43a21edcd807d809749b5e819c6829605` (mock test)
+- **Key commits:** `https://github.com/debosmita09/pwndbg/commit/313b3c7dd (parallel download fix), https://github.com/debosmita09/pwndbg/commit/1aa252d1b66cc14c12ed6a11513f32f6b95e7c7c (remove .DS_Store), https://github.com/debosmita09/pwndbg/commit/0ad54ca43a21edcd807d809749b5e819c6829605 (mock test)
 - **Approach decisions:** I chose wait <pid> per-PID over a bare wait so individual exit codes are captured correctly. Then, I chose `set -o pipefail` over removing error checking entirely to preserve failure detection for pipeline commands elsewhere in the script. I kept the change scoped to exactly one file with no unrelated modifications.
 
 ---
@@ -274,10 +273,9 @@ and waits for all PIDs after the loop so all images download in parallel.
 
 ## Resources Used
 
-- `https://github.com/pwndbg/pwndbg/blob/dev/README.md`
-- `https://github.com/pwndbg/pwndbg/blob/dev/CLAUDE.md`
-- `https://github.com/pwndbg/pwndbg/tree/dev/docs/contributing`
-- `https://github.com/pwndbg/pwndbg/blob/dev/docker-compose.yml`
-- `https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens`
-- `https://www.gnu.org/software/bash/manual/bash.html#Job-Control`
-<img width="468" height="636" alt="image" src="https://github.com/user-attachments/assets/d96b478d-b5c7-45f4-857c-3d132f0f6294" />
+- https://github.com/pwndbg/pwndbg/blob/dev/README.md
+- https://github.com/pwndbg/pwndbg/blob/dev/CLAUDE.md
+- https://github.com/pwndbg/pwndbg/tree/dev/docs/contributing
+- https://github.com/pwndbg/pwndbg/blob/dev/docker-compose.yml
+- https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens
+- https://www.gnu.org/software/bash/manual/bash.html#Job-Control
