@@ -106,10 +106,10 @@ Since pwndbg's 'setup.sh' explicitly does not support macOS, I set up my develop
 
 Root cause: In 'tests/library/qemu_system/download-kernel-images.sh' at lines 28–31:
 
-'while read -r hash file; do
+``` while read -r hash file; do
     echo "Downloading ${file}..."
     download "${file}"   # ← no & = blocks until complete
-done < "${OUT_DIR}/hashsums.txt"'
+done < "${OUT_DIR}/hashsums.txt" ```
 
 Each download() call is synchronous. Bash does not proceed to the next loop iteration until wget finishes, with multiple large kernel images.
 
