@@ -16,7 +16,7 @@ I picked issue #3005, "Speed up the kernel images download", from the pwndbg rep
 
 The proposed solution was to parallelize the existing download script without introducing any additional dependencies. Since this only requires modifying an existing shell script, it is a well-scoped issue that still has a meaningful impact on contributor experience.
 
-Before writing any code, I introduced myself on the issue thread: `https://github.com/pwndbg/pwndbg/issues/3005` and proposed parallelizing the download script without adding extra dependencies. Rather than assuming how the kernel images were managed, I asked whether the maintainers controlled the image hosting because that would determine whether compressed images could realistically be supported. The maintainers directed me to the existing download script (`tests/library/qemu_system/download-kernel-images.sh`), confirming that it was the correct place to implement the optimization. Later, I continued the discussion about compressed kernel images and dependency management, where the maintainers explained that they preferred avoiding new dependencies and that compressed images would require infrastructure changes outside the scope of this issue. I also connected with the community on Discord to better understand the project`s workflow before beginning implementation.
+Before writing any code, I introduced myself on the issue thread: https://github.com/pwndbg/pwndbg/issues/3005 and proposed parallelizing the download script without adding extra dependencies. Rather than assuming how the kernel images were managed, I asked whether the maintainers controlled the image hosting because that would determine whether compressed images could realistically be supported. The maintainers directed me to the existing download script (`tests/library/qemu_system/download-kernel-images.sh`), confirming that it was the correct place to implement the optimization. Later, I continued the discussion about compressed kernel images and dependency management, where the maintainers explained that they preferred avoiding new dependencies and that compressed images would require infrastructure changes outside the scope of this issue. I also connected with the community on Discord to better understand the project`s workflow before beginning implementation.
 
 ---
 
@@ -80,7 +80,7 @@ Based on the issue description and maintainer feedback, I considered the issue c
 
 ### Environment Setup
 
-Since pwndbg`s `setup.sh` explicitly does not support macOS, I set up my development environment using Docker. I installed Docker Desktop and used the `ubuntu24.04-mount` service from the project`s included `docker-compose.yml`, which spins up a Ubuntu 24.04 container with pwndbg pre-installed and the local repo mounted at `/pwndbg`. This meant any file edits I made in VS Code on my Mac were immediately reflected inside the container, and the git history was fully accessible. I also faced a lot of problems setting up the environment along the way like the default branch being `dev` instead of `main`, running git push before creating a personal access token, and running `git add` from the repo root `/pwndbg` inside the container (otherwise the paths were doubled up incorrectly). I also had to configure my git identity inside the container since it started as a blank root environment without any git config.
+Since pwndbg's `setup.sh` explicitly does not support macOS, I set up my development environment using Docker. I installed Docker Desktop and used the `ubuntu24.04-mount` service from the project's included `docker-compose.yml`, which spins up a Ubuntu 24.04 container with pwndbg pre-installed and the local repo mounted at `/pwndbg`. This meant any file edits I made in VS Code on my Mac were immediately reflected inside the container, and the git history was fully accessible. I also faced a lot of problems setting up the environment along the way like the default branch being `dev` instead of `main`, running git push before creating a personal access token, and running `git add` from the repo root `/pwndbg` inside the container (otherwise the paths were doubled up incorrectly). I also had to configure my git identity inside the container since it started as a blank root environment without any git config.
 
 ### Steps to Reproduce
 
@@ -106,16 +106,12 @@ Since pwndbg`s `setup.sh` explicitly does not support macOS, I set up my develop
 
 Root cause: In `tests/library/qemu_system/download-kernel-images.sh` at lines 28–31:
 
-<details>
-
 ```javascript
 console.log("while read -r hash file; do
     echo "Downloading ${file}..."
     download "${file}"   # ← no & = blocks until complete
 done < "${OUT_DIR}/hashsums.txt"");
 ```
-
-</details>
 
 Each download() call is synchronous. Bash does not proceed to the next loop iteration until wget finishes, with multiple large kernel images.
 
@@ -212,14 +208,14 @@ Although this idea was interesting, implementing it would require changes to the
 ### Code Changes
 
 - **Files modified:** `tests/library/qemu_system/download-kernel-images.sh`, `tests/library/qemu_system/test-parallel-downloads.sh`
-- **Key commits:** `https://github.com/debosmita09/pwndbg/commit/313b3c7dd (parallel download fix), https://github.com/debosmita09/pwndbg/commit/1aa252d1b66cc14c12ed6a11513f32f6b95e7c7c (remove .DS_Store), https://github.com/debosmita09/pwndbg/commit/0ad54ca43a21edcd807d809749b5e819c6829605 (mock test)
+- **Key commits:** https://github.com/debosmita09/pwndbg/commit/313b3c7dd (parallel download fix), https://github.com/debosmita09/pwndbg/commit/1aa252d1b66cc14c12ed6a11513f32f6b95e7c7c (remove .DS_Store), https://github.com/debosmita09/pwndbg/commit/0ad54ca43a21edcd807d809749b5e819c6829605 (mock test)
 - **Approach decisions:** I chose wait <pid> per-PID over a bare wait so individual exit codes are captured correctly. Then, I chose `set -o pipefail` over removing error checking entirely to preserve failure detection for pipeline commands elsewhere in the script. I kept the change scoped to exactly one file with no unrelated modifications.
 
 ---
 
 ## Pull Request
 
-**PR Link:** `https://github.com/pwndbg/pwndbg/pull/3972`
+**PR Link:** https://github.com/pwndbg/pwndbg/pull/3972
 
 **PR Description:**  Closing Issue #3005
 
@@ -260,7 +256,7 @@ and waits for all PIDs after the loop so all images download in parallel.
 
 ### Challenges Overcome
 
-- macOS is not a supported platform for pwndbg`s setup script, so I had to discover the Docker path by reading README.md and `docker-compose.yml` carefully
+- macOS is not a supported platform for pwndbg's setup script, so I had to discover the Docker path by reading README.md and `docker-compose.yml` carefully
 - Several layers of git configuration issues inside the container (identity, branch names, auth, working directory) had to be resolved one at a time
 
 ### What I`d Do Differently Next Time
