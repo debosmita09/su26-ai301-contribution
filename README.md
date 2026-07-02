@@ -39,9 +39,11 @@ Running ./download-kernel-images.sh downloads each image one at a time. This is 
 - tests/library/qemu_system/download-kernel-images.sh performs all kernel image downloads.
 - tests/library/qemu_system/kernel-tests.sh invokes the download script whenever cached images are unavailable.
 
+#### Repository Investigation
+
 Before implementing the fix, I investigated how kernel images are downloaded throughout the pwndbg repository instead of immediately modifying the first script I found.
 
-Files Investigated: 
+#### Files Investigated: 
 
 - tests/library/qemu_system/download-kernel-images.sh: Downloads all kernel images used for kernel testing. This is where the sequential bottleneck exists.
 - tests/library/qemu_system/kernel-tests.sh: Calls the download script whenever cached images are unavailable.
@@ -49,14 +51,20 @@ Files Investigated:
 - docs/contributing/: Verified contribution workflow, branch policy, and commit conventions.
 - CLAUDE.md: Reviewed repository-specific development instructions before making changes.
 
+I examined these files to understand where the download process originated, how it was invoked, and whether changes would affect other components of the testing workflow.
+
+#### Maintainer Collaboration
+
 Before implementing the fix, I discussed my proposed solution directly on Issue #3005. My initial proposal was to:
 
 - parallelize the existing download script,
 - avoid introducing additional runtime dependencies,
 - understand whether compressed kernel images were feasible.
 
-I first asked how the kernel images were hosted because that would determine whether compressed downloads could realistically be supported. The maintainer pointed me directly to tests/library/qemu_system/download-kernel-images.sh, confirming that the existing script was the correct implementation location.
+I first asked how the kernel images were hosted because that would determine whether compressed downloads could realistically be supported. The maintainer pointed me directly to 'tests/library/qemu_system/download-kernel-images.sh', confirming that the existing script was the correct implementation location.
 After implementing the parallel download solution, I continued the discussion regarding compressed kernel images. The maintainers explained that supporting compressed images would require changes to their image hosting infrastructure and possibly Dockerfiles, but preferred avoiding additional dependencies whenever possible. Based on this feedback, I intentionally kept my implementation focused on parallel downloads while preserving the existing workflow.
+
+#### Acceptance Criteria
 
 Based on the issue description and maintainer feedback, I considered the issue complete only if:
 
@@ -106,8 +114,6 @@ done < "${OUT_DIR}/hashsums.txt"
 Each download() call is synchronous. Bash does not proceed to the next loop iteration until wget finishes, with multiple large kernel images.
 
 A secondary issue: the script uses set -o errexit at the top. This flag causes the script to exit if a background job (&) fails before wait is called, making it incompatible with the parallel approach without modification.
-
-Before modifying the script, I inspected the Git history to understand whether similar performance improvements had already been attempted. The history showed maintenance changes to the download script but no previous effort to parallelize downloads, giving confidence that the proposed solution would not conflict with an existing design decision.
 
 I searched the repository for existing examples of background jobs (&), PID tracking, and wait usage so that my implementation would remain consistent with the rest of the project. No comparable shell script implementing parallel downloads existed, so I followed standard Bash job-control patterns rather than introducing a custom framework or external dependency.
 
