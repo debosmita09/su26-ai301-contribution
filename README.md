@@ -11,9 +11,12 @@ pwndbg issue #3005
 ---
 
 ## Why I Chose This Issue
-I picked issue #3005 "Speed up the kernel images download" from the pwndbg repo because it's a concrete performance problem with a clear fix. CI is fine since images get cached, but first-time local downloads are slow because everything downloads one at a time.
-The fix is to run the download script paralelly, which is just a sript change without any new dependencies. It is a contained but meaningful problem to solve as a first-time contributor. No changes using Python is required unless the CI workflow needs touching.
-I left a comment on the issue introducing myself, asked if the parallel downloads approach works for them, and offered to open a draft PR. I also connected with the community via discord to get more clarification on their specific requests.
+
+I picked issue #3005, "Speed up the kernel images download", from the pwndbg repository because it is a concrete performance problem with a clear and measurable fix. CI is largely unaffected since kernel images are cached after the first run, but first-time local downloads are noticeably slow because every image is downloaded sequentially.
+
+The proposed solution was to parallelize the existing download script without introducing any additional dependencies. Since this only requires modifying an existing shell script, it is a well-scoped issue that still has a meaningful impact on contributor experience.
+
+Before writing any code, I introduced myself on the issue thread: https://github.com/pwndbg/pwndbg/issues/3005 and proposed parallelizing the download script without adding extra dependencies. Rather than assuming how the kernel images were managed, I asked whether the maintainers controlled the image hosting because that would determine whether compressed images could realistically be supported. The maintainers directed me to the existing download script (tests/library/qemu_system/download-kernel-images.sh), confirming that it was the correct place to implement the optimization. Later, I continued the discussion about compressed kernel images and dependency management, where the maintainers explained that they preferred avoiding new dependencies and that compressed images would require infrastructure changes outside the scope of this issue. I also connected with the community on Discord to better understand the project's workflow before beginning implementation.
 
 ---
 
@@ -33,8 +36,36 @@ Running ./download-kernel-images.sh downloads each image one at a time. This is 
 
 ### Affected Components
 
-tests/library/qemu_system/download-kernel-images.sh is the only file involved with this issue, with kernel-tests.sh calling the download script when no cached images exist.
+- tests/library/qemu_system/download-kernel-images.sh performs all kernel image downloads.
+- tests/library/qemu_system/kernel-tests.sh invokes the download script whenever cached images are unavailable.
 
+Before implementing the fix, I investigated how kernel images are downloaded throughout the pwndbg repository instead of immediately modifying the first script I found.
+
+Files Investigated: 
+
+- tests/library/qemu_system/download-kernel-images.sh: Downloads all kernel images used for kernel testing. This is where the sequential bottleneck exists.
+- tests/library/qemu_system/kernel-tests.sh: Calls the download script whenever cached images are unavailable.
+- docker-compose.yml: Used to launch the Ubuntu development environment because setup.sh does not support macOS.
+- docs/contributing/: Verified contribution workflow, branch policy, and commit conventions.
+- CLAUDE.md: Reviewed repository-specific development instructions before making changes.
+
+Before implementing the fix, I discussed my proposed solution directly on Issue #3005. My initial proposal was to:
+
+- parallelize the existing download script,
+- avoid introducing additional runtime dependencies,
+- understand whether compressed kernel images were feasible.
+
+I first asked how the kernel images were hosted because that would determine whether compressed downloads could realistically be supported. The maintainer pointed me directly to tests/library/qemu_system/download-kernel-images.sh, confirming that the existing script was the correct implementation location.
+After implementing the parallel download solution, I continued the discussion regarding compressed kernel images. The maintainers explained that supporting compressed images would require changes to their image hosting infrastructure and possibly Dockerfiles, but preferred avoiding additional dependencies whenever possible. Based on this feedback, I intentionally kept my implementation focused on parallel downloads while preserving the existing workflow.
+
+Based on the issue description and maintainer feedback, I considered the issue complete only if:
+
+- all kernel image downloads execute concurrently,
+- no additional runtime dependencies are introduced,
+- the existing workflow remains unchanged,
+- failures from individual downloads are still reported correctly,
+- the implementation remains limited to the existing download script,
+- CI behavior remains unaffected.
 ---
 
 ## Reproduction Process
@@ -75,6 +106,10 @@ done < "${OUT_DIR}/hashsums.txt"
 Each download() call is synchronous. Bash does not proceed to the next loop iteration until wget finishes, with multiple large kernel images.
 
 A secondary issue: the script uses set -o errexit at the top. This flag causes the script to exit if a background job (&) fails before wait is called, making it incompatible with the parallel approach without modification.
+
+Before modifying the script, I inspected the Git history to understand whether similar performance improvements had already been attempted. The history showed maintenance changes to the download script but no previous effort to parallelize downloads, giving confidence that the proposed solution would not conflict with an existing design decision.
+
+I searched the repository for existing examples of background jobs (&), PID tracking, and wait usage so that my implementation would remain consistent with the rest of the project. No comparable shell script implementing parallel downloads existed, so I followed standard Bash job-control patterns rather than introducing a custom framework or external dependency.
 
 ### Proposed Solution
 
@@ -123,6 +158,16 @@ The kernel-tests.sh script, which calls download-kernel-images.sh is the closest
 - Ran ./lint.sh inside the container: shell script passed shfmt formatting checks enforced by the pre-push hook from setup-dev.sh.
 - Error handling verified: the failed flag correctly tracked any download that exits non-zero and exits the script with code 1 with a clear error message.
 
+Beyond the original issue, I also considered several additional scenarios to ensure the implementation remained robust:
+
+- one download fails while the remaining downloads succeed,
+- multiple downloads fail simultaneously,
+- wait returns processes in a different order than they were launched,
+- existing cached images skip downloads entirely,
+- future additions to hashsums.txt automatically execute in parallel without requiring code changes.
+
+Tracking every PID individually ensures that each background job is waited on before the script exits, regardless of completion order.
+
 ---
 
 ## Implementation Notes
@@ -144,6 +189,13 @@ The challenges I faced included:
 - The project's default branch is dev not main, so git rebase origin/main failed until I switched to origin/dev.
 - Two CI jobs failed with unrelated infrastructure issues: test_aarch64_store_instructions (QEMU connection timeout race condition) and tests-using-nix (transient Nix cache HTTP 416 error from cache.nixos.org). I left comments on the PR explaining that both are pre-existing/infrastructure issues unrelated to this change.
 
+Instead of using a single wait, I waited on each PID individually so that failures from every download could be detected reliably.
+
+I also chose not to introduce tools such as GNU Parallel. While they would simplify concurrent execution, they would also introduce an additional dependency for contributors. Using native Bash job control keeps the implementation lightweight and consistent with the rest of the project.
+
+During discussion, maintainers mentioned that downloading compressed kernel images could provide an additional performance improvement.
+
+Although this idea was interesting, implementing it would require changes to the project's image hosting infrastructure, decompression workflow, and potentially Dockerfiles. Since Issue #3005 specifically focused on improving download speed, I intentionally limited my implementation to parallelizing downloads while preserving the existing workflow and avoiding unrelated changes.
 
 ### Code Changes
 
