@@ -1,5 +1,5 @@
 # su26-ai301-contribution
-pwndbg issue #3005
+# pwndbg Issues 
 
 # Contribution 1: speed up the kernel images download #3005
 
@@ -275,3 +275,91 @@ and waits for all PIDs after the loop so all images download in parallel.
 - https://github.com/pwndbg/pwndbg/blob/dev/docker-compose.yml
 - https://docs.github.com/en/authentication/keeping-your-account-and-data-secure/managing-your-personal-access-tokens
 - https://www.gnu.org/software/bash/manual/bash.html#Job-Control
+
+  
+
+--------------------------------------------------------------------------------------------
+
+
+
+# Contribution 2: Add helpers for reading/writing to physical memory with QEMU #1950
+
+**Contribution Number:** 2
+**Student:** Debosmita Mallick
+**Issue:** https://github.com/pwndbg/pwndbg/issues/1950
+**Status:** Phase I: Completed | Phase II: In-Progress 
+
+---
+
+## Why I Chose This Issue
+
+I picked issue #1950, "Add helpers for reading/writing to physical memory with QEMU", from the pwndbg repository because it involves adding a user-facing command that touches multiple layers of the codebase — the command layer, the aglib layer, and the testing infrastructure. After completing PR #3972, I wanted a contribution that required deeper familiarity with how pwndbg structures its internals rather than just modifying a shell script.
+
+The issue is labeled "good first issue" and "help wanted" with no existing PR or assignee, making it an open and well-scoped next step. The proposed fix is self-contained: expose the `Qqemu.PhyMemMode` maintenance packet through a dedicated pwndbg command so that users do not have to send raw GDB maintenance packets manually when debugging kernel memory with QEMU.
+
+Before writing any code, I introduced myself on the issue thread and proposed starting with a `qemu_mem_mode [phys|virt]` command as the simpler option, with `physread/physwrite` as a natural follow-up. I asked the maintainers to confirm the preferred command naming and whether GDB-only scope was acceptable, since `maintenance packet` is a GDB-specific interface with no direct LLDB equivalent.
+
+---
+
+## Understanding the Issue
+
+### Problem Description
+
+When debugging with QEMU, GDB operates in virtual address mode by default. QEMU exposes a maintenance packet interface that allows switching between virtual and physical memory modes, but there is no pwndbg command wrapping this workflow. Users who need to read or write physical memory must manually send raw maintenance packets, which is error-prone and interrupts the debugging workflow.
+
+### Expected Behavior
+
+A dedicated command like `qemu_mem_mode [phys|virt]` should allow users to switch between physical and virtual memory modes cleanly. A `physread/physwrite` command should temporarily switch to physical mode, perform the operation, and restore the previous mode automatically — so the user never has to manage mode state manually.
+
+### Current Behavior
+
+Users must manually run the following GDB commands each time they need to access physical memory:
+
+```bash
+maintenance packet qqemu.PhyMemMode    # check current mode
+maintenance packet Qqemu.PhyMemMode:1  # switch to physical
+maintenance packet Qqemu.PhyMemMode:0  # switch back to virtual```
+
+There is no pwndbg command wrapping this workflow, and the mode is not restored automatically if something goes wrong mid-session.
+
+### Affected Components
+
+- pwndbg/aglib/kernel/paging.py: already contains switch_to_phymem_mode() at lines 342–384, which saves the current mode, switches to physical, and restores the original mode in a finally block. This is the internal implementation that the new command should expose to users.
+- pwndbg/aglib/qemu.py: contains QEMU detection logic (is_qemu(), is_qemu_kernel()) and send_remote() infrastructure used for all maintenance packet communication.
+- `pwndbg/commands/`: location for the new command file.
+- pwndbg/commands/__init__.py: requires importing the new command module.
+- `tests/library/qemu_system/tests/`: location for new kernel tests covering the command.
+
+#### Repository Investigation
+
+Before proposing a solution, I investigated how the `PhyMemMode` packet was already being used in the codebase. I found that `switch_to_phymem_mode()` in pwndbg/aglib/kernel/paging.py already implements the full mode-switching pattern internally for page walks. It saves the old value, switches to physical mode, performs the operation, and restores the previous mode in a `finally` block regardless of success or failure. This means the core logic already exists and the primary work is exposing it through a user-facing command following pwndbg's command architecture described in `CLAUDE.md` and docs/contributing/adding-a-command.md.
+
+#### Files Investigated:
+
+- pwndbg/aglib/kernel/paging.py: existing `switch_to_phymem_mode()` implementation and usage pattern
+- pwndbg/aglib/qemu.py: QEMU detection, `send_remote()` calls, and `read_physical_memory()`
+- pwndbg/commands/__init__.py: command registration pattern
+- docs/contributing/adding-a-command.md: command creation guide
+- `CLAUDE.md`: import rules, decorator usage, and architecture overview
+- `tests/library/qemu_system/tests/`: existing kernel test patterns to follow
+
+#### Maintainer Collaboration
+
+I introduced myself on issue #1950 and proposed the `qemu_mem_mode [phys|virt]` command as the starting point, with `physread/physwrite` as a follow-up. I asked the maintainers to confirm the preferred command name and whether GDB-only scope was acceptable given that `maintenance packet` has no LLDB equivalent. I am waiting for their response before opening a draft PR.
+
+#### Acceptance Criteria
+
+- `qemu_mem_mode phys` switches GDB to physical memory mode
+- `qemu_mem_mode virt` switches back to virtual memory mode
+- Running `qemu_mem_mode` with no argument reports the current mode
+- The command is gated with `@pwndbg.commands.OnlyWhenQemuKernel` so it only runs in the correct context
+- `physread <addr> <size>` reads from a physical address by temporarily switching mode and restoring it after
+- `physwrite <addr> <value>` writes to a physical address using the same temporary mode switch pattern
+- All existing kernel tests continue to pass
+- New tests are added in `tests/library/qemu_system/tests/ covering` the new commands
+
+---
+
+## Reproduction Process
+
+### Environment Setup
