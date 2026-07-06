@@ -318,7 +318,8 @@ Users must manually run the following GDB commands each time they need to access
 ```bash
 maintenance packet qqemu.PhyMemMode    # check current mode
 maintenance packet Qqemu.PhyMemMode:1  # switch to physical
-maintenance packet Qqemu.PhyMemMode:0  # switch back to virtual```
+maintenance packet Qqemu.PhyMemMode:0  # switch back to virtual
+```
 
 There is no pwndbg command wrapping this workflow, and the mode is not restored automatically if something goes wrong mid-session.
 
