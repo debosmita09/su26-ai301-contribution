@@ -287,7 +287,7 @@ and waits for all PIDs after the loop so all images download in parallel.
 **Contribution Number:** 2
 **Student:** Debosmita Mallick
 **Issue:** https://github.com/pwndbg/pwndbg/issues/1950
-**Status:** Phase I: Completed | Phase II: In-Progress 
+**Status:** Phase I: Completed | Phase II: Completed | Phase III: In-Progress
 
 ---
 
@@ -360,7 +360,126 @@ I introduced myself on issue #1950 and proposed the `qemu_mem_mode [phys|virt]` 
 - New tests are added in `tests/library/qemu_system/tests/ covering` the new commands
 
 ---
-
 ## Reproduction Process
 
 ### Environment Setup
+
+Since pwndbg's `setup.sh` explicitly does not support macOS, I set up my development
+environment using Docker. I installed Docker Desktop and used the `ubuntu24.04-mount`
+service from the project's included `docker-compose.yml`, which spins up a Ubuntu 24.04
+container with pwndbg pre-installed and the local repo mounted at `/pwndbg`. This meant
+any file edits I made in VS Code on my Mac were immediately reflected inside the container,
+and the git history was fully accessible. I faced some friction during setup — the
+`docker-compose.yml` lives inside the nested `~/pwndbg/pwndbg/` directory, not the parent
+folder, so `docker compose` had to be run from there. The compose service is also named
+`ubuntu24.04-mount`, not `pwndbg`, which caused an initial "no such service" error. I also
+had to configure my git identity inside the container since it starts as a blank root
+environment without any git config.
+
+### Steps to Reproduce
+
+This is a missing-feature issue, so reproduction means demonstrating the gap between what
+users must do today and what the issue proposes.
+
+1. Cloned my fork and started the mounted container using:
+   `cd ~/pwndbg/pwndbg` and `docker compose run --rm ubuntu24.04-mount`
+2. Inside the container, started GDB with pwndbg loaded:
+   `gdb --quiet`
+3. Inside GDB, loaded pwndbg:
+   `python import pwndbg`
+4. Attempted to use the proposed command:
+   `qemu_mem_mode`
+5. **Expected:** A command that switches QEMU between physical and virtual memory modes.
+6. **Observed:** `Undefined command: "qemu_mem_mode". Try "help".`
+7. Tried the raw manual workaround users must use today:
+   `maintenance packet qqemu.PhyMemMode`
+8. **Observed:** `packets can only be sent to a remote target` — this error appears because
+   no QEMU target is attached, but this raw syntax is what users must memorize and type
+   manually in a real kernel debugging session with no automatic mode restoration on failure.
+
+### Reproduction Evidence
+
+- **Working branch:** https://github.com/debosmita09/pwndbg/tree/fix-issue-1950
+- **Screenshot:**
+  
+  <img width="719" height="219" alt="Screenshot 2026-07-12 at 5 31 17 PM" src="https://github.com/user-attachments/assets/949caf06-6366-4671-a8ae-d9082bb11e20" />
+
+- **My findings:** The issue is entirely the absence of a command layer wrapping the
+  `PhyMemMode` maintenance packet interface. The internal logic already exists in
+  `switch_to_phymem_mode()` at lines 342–384 of `pwndbg/aglib/kernel/paging.py` — it saves
+  the current mode, switches to physical, and restores the original in a `finally` block —
+  but it is never exposed to users as a GDB command.
+
+---
+
+## Solution Approach
+
+### Analysis
+
+Root cause: No user-facing command exists in `pwndbg/commands/` that wraps the
+`qqemu.PhyMemMode` / `Qqemu.PhyMemMode:1/0` maintenance packet workflow. Users who need to
+access physical memory during QEMU kernel debugging must manually send raw maintenance
+packets, remember the correct packet syntax, and manage mode state themselves — with no
+automatic restoration if a session fails mid-operation.
+
+The internal infrastructure already exists: `switch_to_phymem_mode()` in
+`pwndbg/aglib/kernel/paging.py` implements the full save/switch/restore pattern, and
+`send_remote()` in `pwndbg/aglib/qemu.py` handles all maintenance packet communication.
+I confirmed via `git log pwndbg/aglib/kernel/paging.py` that `switch_to_phymem_mode()` was
+introduced for internal page-walk use only and was never surfaced as a command. I also
+identified the correct decorator for gating QEMU-only commands via
+`grep -r "OnlyWhenQemuKernel" pwndbg/commands/`.
+
+I introduced myself on the issue thread and proposed starting with a
+`qemu_mem_mode [phys|virt]` command as the simpler option, with `physread/physwrite` as a
+follow-up. I asked the maintainers to confirm the preferred command name and whether
+GDB-only scope is acceptable since `maintenance packet` has no LLDB equivalent, and am
+waiting for their response before opening a draft PR.
+
+### Proposed Solution
+
+Create a new command file in `pwndbg/commands/` that exposes `qemu_mem_mode` as a
+user-facing command wrapping the existing `send_remote()` infrastructure, gated with
+`@pwndbg.commands.OnlyWhenQemuKernel`. Add `physread` and `physwrite` commands that reuse
+`switch_to_phymem_mode()` so mode is always restored automatically.
+
+### Implementation Plan
+
+Using UMPIRE framework (adapted):
+
+**Understand:** When debugging a kernel with QEMU, GDB operates in virtual address mode by
+default. QEMU exposes a maintenance packet interface for switching between virtual and
+physical memory modes, but pwndbg has no command wrapping this workflow. Users who need to
+inspect physical memory must manually send raw maintenance packets and manage mode state
+themselves, with no automatic restoration if something goes wrong mid-session.
+
+**Match:** `switch_to_phymem_mode()` in `pwndbg/aglib/kernel/paging.py` (lines 342–384) is
+the direct analogue — it already implements the save/switch/restore pattern internally for
+page walks. The `@pwndbg.commands.OnlyWhenQemuKernel` decorator found in existing commands
+shows the correct pattern for gating commands to the QEMU kernel context.
+
+**Plan:**
+1. Create `pwndbg/commands/qemu_mem.py` with a `qemu_mem_mode` command:
+   - `qemu_mem_mode phys` → calls `send_remote("Qqemu.PhyMemMode:1")`
+   - `qemu_mem_mode virt` → calls `send_remote("Qqemu.PhyMemMode:0")`
+   - `qemu_mem_mode` with no argument → reads and prints current mode via `send_remote("qqemu.PhyMemMode")`
+   - Gated with `@pwndbg.commands.OnlyWhenQemuKernel`
+2. Add `physread <addr> <size>` and `physwrite <addr> <value>` in the same file, reusing
+   `switch_to_phymem_mode()` as the context manager so mode is always restored on failure
+3. Register the module in `pwndbg/commands/init.py` following the existing import pattern
+
+**Implement:** https://github.com/debosmita09/pwndbg/tree/fix-issue-1950 
+
+**Review:** Read `docs/contributing/index.md` and `CLAUDE.md` for import conventions and
+command creation patterns. The PR will target the `dev` branch of pwndbg/pwndbg as
+required — the project does not use `main` for development. Run `./lint.sh` inside the
+container before pushing. Confirm command naming with maintainers before opening PR since
+naming is a maintainer decision.
+
+**Evaluate:**
+Manual verification in a live QEMU kernel session:
+- `qemu_mem_mode phys` → confirm `maintenance packet qqemu.PhyMemMode` returns `1`
+- `qemu_mem_mode virt` → confirm it returns `0`
+- Interrupt `physread` mid-operation → confirm mode restores to virtual automatically
+- Add automated tests in `tests/library/qemu_system/tests/` following existing kernel test patterns
+- Run `./kernel-tests.sh` to confirm no regressions in existing tests
