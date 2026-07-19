@@ -287,7 +287,7 @@ and waits for all PIDs after the loop so all images download in parallel.
 **Contribution Number:** 2
 **Student:** Debosmita Mallick
 **Issue:** https://github.com/pwndbg/pwndbg/issues/1950
-**Status:** Phase I: Completed | Phase II: Completed | Phase III: In-Progress
+**Status:** Phase I: Completed | Phase II: Completed | Phase III: Completed | Phase IV: In-Progress
 
 ---
 
@@ -483,3 +483,118 @@ Manual verification in a live QEMU kernel session:
 - Interrupt `physread` mid-operation → confirm mode restores to virtual automatically
 - Add automated tests in `tests/library/qemu_system/tests/` following existing kernel test patterns
 - Run `./kernel-tests.sh` to confirm no regressions in existing tests
+
+---
+
+## Testing Strategy
+
+### Unit Tests
+
+The commands in `pwndbg/commands/qemu_mem.py` interface with a live QEMU target via GDB maintenance packets, so there are no unit-testable functions to isolate without a running QEMU session. Manual verification was performed inside the Docker container by loading pwndbg in GDB and confirming that all three commands — `qemu-mem-mode`, `physread`, and `physwrite` — registered correctly and their help text rendered as expected.
+
+### Integration Tests
+
+Full integration tests require a live QEMU kernel session and are run via `./kernel-tests.sh`. These cannot be exercised locally without a kernel image and QEMU setup. New tests in `tests/library/qemu_system/tests/` will be added once maintainers confirm the final command naming on the issue thread, since test names and assertions depend on the final command interface.
+
+### Manual Testing
+
+- Started GDB inside the `ubuntu24.04-mount` Docker container and loaded pwndbg.
+- Ran `qemu-mem-mode` — confirmed "Undefined command" no longer appears; help text renders correctly.
+- Ran `help qemu-mem-mode`, `help physread`, and `help physwrite` — all three commands load with correct descriptions and argument signatures.
+- Ran `./lint.sh --check` inside the container: ruff, shfmt, vermin, custom lint rules, and mypy all passed with no errors across 433 source files.
+- Confirmed pwndbg reports 201 loaded commands (up from 198 before the change), matching the three newly registered commands.
+
+Beyond the core commands, I also considered the following edge cases to ensure the implementation was robust:
+
+- `physread` or `physwrite` raises an exception mid-operation — mode is always restored to the previous value in the `finally` block regardless of success or failure.
+- `qemu-mem-mode` called with no argument — reads and prints the current mode without modifying it.
+- Commands called outside a QEMU kernel session — `@pwndbg.commands.OnlyWhenQemuKernel` gates all three commands and returns an appropriate error message.
+
+---
+
+## Implementation Notes
+
+### Phase III Progress
+
+The following notes what I built and modified:
+
+- Created `pwndbg/commands/qemu_mem.py` — new command file implementing three commands:
+  - `qemu-mem-mode [phys|virt]` — switches QEMU between physical and virtual memory modes, or prints the current mode when called with no argument
+  - `physread <addr> <size>` — reads from a physical address by temporarily switching to physical mode and restoring the previous mode in a `finally` block
+  - `physwrite <addr> <value> [--size N]` — writes to a physical address using the same temporary mode switch pattern
+- Modified `pwndbg/commands/__init__.py` — registered `pwndbg.commands.qemu_mem` in the kernel command import block alongside `kbase`, `kbpf`, and other kernel commands.
+- All three commands are gated with `@pwndbg.commands.OnlyWhenQemuKernel` so they only activate in a QEMU kernel debugging session.
+- Mode restoration is handled in `finally` blocks — the previous `PhyMemMode` value is always restored even if the read or write raises an exception.
+
+The challenges I faced included:
+
+- `ModuleNotFoundError: No module named 'pwndbg.dbg'` — attempted `import pwndbg.dbg` directly, but `pwndbg.dbg` is an attribute of the top-level `pwndbg` package, not an importable submodule. Fixed by using `import pwndbg` and accessing `pwndbg.dbg` as an attribute, matching the pattern in `pwndbg/aglib/kernel/paging.py`.
+- `AssertionError: You must set the argument type for a store action` — pwndbg's command framework requires `type=str` on all argparse store actions, even optional ones with `nargs="?"`. Not documented anywhere obvious — found by reading the assertion in `pwndbg/commands/__init__.py` line 369.
+- Command name uses hyphens not underscores — pwndbg automatically converts function names from `qemu_mem_mode` → `qemu-mem-mode` at registration time. Discovered when `help qemu_mem_mode` returned "Undefined command" but `help qemu-mem-mode` worked. This is enforced by the framework at line 186 of `__init__.py`.
+- `write_memory` expects `bytearray` not `bytes` — mypy caught this during `./lint.sh --check`. Fixed by wrapping `value.to_bytes(size, "little")` in `bytearray()`.
+- Lint failure in `test-parallel-downloads.sh` — shfmt flagged spacing around `2>/dev/null` and arithmetic expressions from the previous PR. Fixed with `./lint.sh -f`.
+
+### Code Changes
+
+- **Files modified:** `pwndbg/commands/qemu_mem.py` (created), `pwndbg/commands/__init__.py` (import registration), `tests/library/qemu_system/test-parallel-downloads.sh` (shfmt fix)
+- **Key commits:** https://github.com/debosmita09/pwndbg/commit/81cd380ed (add qemu-mem-mode, physread, physwrite commands)
+- **Approach decisions:** Used `pwndbg.dbg.selected_inferior().send_remote()` directly instead of going through `switch_to_phymem_mode()` for `qemu-mem-mode`, since that command needs fine-grained control over what packet is sent. Used `finally` blocks for `physread` and `physwrite` to guarantee mode restoration regardless of outcome — the same pattern already established in `pwndbg/aglib/kernel/paging.py`. Kept all three commands in a single file to minimize review surface.
+
+---
+
+## Pull Request
+
+**PR Link:** Pending maintainer confirmation of command naming on issue thread.
+
+**PR Description (draft):**
+
+Closes #1950.
+
+Adds three user-facing commands for interacting with QEMU's `PhyMemMode` maintenance packet interface during kernel debugging sessions:
+
+- `qemu-mem-mode [phys|virt]` — switch between physical and virtual memory modes, or print the current mode when called with no argument
+- `physread <addr> <size>` — read bytes from a physical address by temporarily switching to physical mode and restoring the previous mode automatically
+- `physwrite <addr> <value> [--size N]` — write a value to a physical address using the same temporary mode switch pattern
+
+All commands are gated with `@pwndbg.commands.OnlyWhenQemuKernel`. Mode is always restored in a `finally` block regardless of whether the operation succeeds or fails. The implementation uses `pwndbg.dbg.selected_inferior().send_remote()` directly, following the pattern already established in `switch_to_phymem_mode()` in `pwndbg/aglib/kernel/paging.py`.
+
++ [x] I read the contributing documentation.
++ [x] I am providing a screenshot of the new feature: adding qemu-mem-mode, physread, and physwrite commands for QEMU physical memory access.
+
+<img width="684" height="155" alt="Screenshot 2026-07-19 at 7 37 08 PM" src="https://github.com/user-attachments/assets/ace74587-f090-45e1-844a-a88d42df95c7" />
+
+**Status:** Draft — awaiting maintainer response on issue #1950 regarding command naming before opening.
+
+---
+
+## Learnings & Reflections
+
+### Technical Skills Gained
+
+- Reading and navigating pwndbg's command registration architecture via `pwndbg/commands/__init__.py`
+- Understanding how argparse integrates with pwndbg's custom `CommandObj` framework, including framework-level constraints like required `type=` annotations
+- Using `grep` and `git log` to trace how internal patterns propagate through a large Python codebase before writing any new code
+- Running mypy inside a project's existing CI toolchain to catch type errors before pushing
+
+### Challenges Overcome
+
+- The pwndbg command framework enforces constraints that are not documented in the contributing guide. Both the `type=str` requirement and the hyphen-only naming rule were discovered by reading assertion messages in the framework source, not from docs.
+- `pwndbg.dbg` is not an importable submodule — it is an attribute on the top-level package. This is an easy mistake to make when following import patterns from other parts of the codebase that look similar but live in a different package layer.
+
+### What I'd Do Differently Next Time
+
+- Read `pwndbg/commands/__init__.py` in full before writing a new command file, not just the files in `pwndbg/commands/` that the new command resembles.
+- Run `./lint.sh --check` incrementally after each small change instead of only at the end, to catch mypy and shfmt issues earlier.
+- Ask maintainers to confirm command naming before writing any code, not after — naming is a maintainer decision and the fix is trivial to make before the command file exists.
+
+---
+
+## Resources Used
+
+- https://github.com/pwndbg/pwndbg/blob/dev/CLAUDE.md
+- https://github.com/pwndbg/pwndbg/blob/dev/docs/contributing/index.md
+- https://github.com/pwndbg/pwndbg/blob/dev/pwndbg/aglib/kernel/paging.py
+- https://github.com/pwndbg/pwndbg/blob/dev/pwndbg/aglib/qemu.py
+- https://github.com/pwndbg/pwndbg/blob/dev/pwndbg/commands/__init__.py
+- https://qemu-project.gitlab.io/qemu/system/gdb.html
+- https://docs.python.org/3/library/argparse.html
