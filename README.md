@@ -544,13 +544,13 @@ The challenges I faced included:
 
 ## Pull Request
 
-**PR Link:** Pending maintainer confirmation of command naming on issue thread.
+**PR Link:** https://github.com/pwndbg/pwndbg/pull/4038
 
-**PR Description (draft):**
+**PR Description:**
 
-Closes #1950.
+Closing #1950.
 
-Adds three user-facing commands for interacting with QEMU's `PhyMemMode` maintenance packet interface during kernel debugging sessions:
+Adding three user-facing commands for interacting with QEMU's `PhyMemMode` maintenance packet interface during kernel debugging sessions:
 
 - `qemu-mem-mode [phys|virt]` — switch between physical and virtual memory modes, or print the current mode when called with no argument
 - `physread <addr> <size>` — read bytes from a physical address by temporarily switching to physical mode and restoring the previous mode automatically
