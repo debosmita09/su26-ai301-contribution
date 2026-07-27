@@ -287,7 +287,7 @@ and waits for all PIDs after the loop so all images download in parallel.
 **Contribution Number:** 2
 **Student:** Debosmita Mallick
 **Issue:** https://github.com/pwndbg/pwndbg/issues/1950
-**Status:** Phase I: Completed | Phase II: Completed | Phase III: Completed | Phase IV: In-Progress
+**Status:** Phase I: Completed | Phase II: Completed | Phase III: Completed | Phase IV: Completed
 
 ---
 
